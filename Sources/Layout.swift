@@ -31,6 +31,18 @@ struct Layout {
         property(TISCopyCurrentKeyboardLayoutInputSource().takeRetainedValue(), kTISPropertyInputSourceID)
     }
 
+    /// Flag emoji for the current input source's language, e.g. 🇷🇺. Main thread only.
+    static func currentFlag() -> String? {
+        let source = TISCopyCurrentKeyboardInputSource().takeRetainedValue()
+        guard let languages: [String] = property(source, kTISPropertyInputSourceLanguages),
+              let language = languages.first else { return nil }
+        // "ru" → "ru-Cyrl-RU" → "RU"
+        let likely = Locale.Language(identifier: Locale.Language(identifier: language).maximalIdentifier)
+        guard let region = likely.region?.identifier, region.count == 2 else { return nil }
+        let scalars = region.unicodeScalars.compactMap { UnicodeScalar(0x1F1E6 + $0.value - 65) }
+        return String(String.UnicodeScalarView(scalars))
+    }
+
     /// Main thread only.
     func select() {
         TISSelectInputSource(source)

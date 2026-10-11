@@ -1,4 +1,5 @@
 import AppKit
+import Carbon
 import ServiceManagement
 
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
@@ -9,7 +10,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let accessItem = NSMenuItem(title: "Нужен доступ: Универсальный доступ…", action: #selector(openAccessibilitySettings), keyEquivalent: "")
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        statusItem.button?.title = "⌥"
+        updateFlag()
+        DistributedNotificationCenter.default().addObserver(
+            self, selector: #selector(updateFlag),
+            name: NSNotification.Name(kTISNotifySelectedKeyboardInputSourceChanged as String), object: nil)
         let menu = NSMenu()
         menu.delegate = self
         for item in [accessItem, enabledItem, loginItem] {
@@ -37,6 +41,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         accessItem.isHidden = AXIsProcessTrusted()
         enabledItem.state = switcher.enabled ? .on : .off
         loginItem.state = SMAppService.mainApp.status == .enabled ? .on : .off
+    }
+
+    @objc private func updateFlag() {
+        statusItem.button?.title = Layout.currentFlag() ?? "⌥"
     }
 
     @objc private func toggleEnabled() {
