@@ -78,6 +78,7 @@ struct Layout {
 
     /// Re-types `text` as if its keys had been pressed in the next layout.
     /// The source layout is the one that can type most of the text; ties go to `currentID`.
+    /// It also decides the returned target.
     static func convert(_ text: String, layouts: [Layout], currentID: String?) -> (text: String, target: Layout)? {
         guard layouts.count > 1 else { return nil }
         let maps = layouts.map { $0.keyMap() }
@@ -86,13 +87,17 @@ struct Layout {
         guard best > 0 else { return nil }
         let candidates = layouts.indices.filter { scores[$0] == best }
         let from = candidates.first { layouts[$0].id == currentID } ?? candidates[0]
-        let target = layouts[(from + 1) % layouts.count]
+        // Mixed text: a character the source can't type switches the source to a layout that can.
+        var source = from
         let converted = text.map { ch -> String in
-            guard let key = maps[from][ch] else { return String(ch) }
-            let s = target.string(keyCode: key.keyCode, shift: key.shift, caps: false)
+            if maps[source][ch] == nil, let other = layouts.indices.first(where: { maps[$0][ch] != nil }) {
+                source = other
+            }
+            guard let key = maps[source][ch] else { return String(ch) }
+            let s = layouts[(source + 1) % layouts.count].string(keyCode: key.keyCode, shift: key.shift, caps: false)
             return s.isEmpty ? String(ch) : s
         }.joined()
-        return (converted, target)
+        return (converted, layouts[(from + 1) % layouts.count])
     }
 
     private static func property<T>(_ source: TISInputSource, _ key: CFString) -> T? {
