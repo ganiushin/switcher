@@ -13,6 +13,11 @@ final class Switcher {
     private static let backspaceKey: UInt16 = 51
     private static let maxTapDuration: CFAbsoluteTime = 0.5
     private static let maxBufferLength = 256
+    /// Terminals ignore the selection when pasting, so the text is erased with backspaces instead.
+    private static let terminals: Set<String> = [
+        "com.mitchellh.ghostty", "com.apple.Terminal", "com.googlecode.iterm2",
+        "net.kovidgoyal.kitty", "org.alacritty", "com.github.wez.wezterm",
+    ]
 
     var enabled = true
 
@@ -131,12 +136,20 @@ final class Switcher {
                 DispatchQueue.main.async { self.busy = false }
             }
         } else {
+            let terminal = Switcher.terminals.contains(NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "")
             worker.async {
                 var target: Layout?
                 if let selected = Selection.read(),
                    let result = Layout.convert(selected, layouts: layouts, currentID: currentID) {
-                    Selection.replace(with: result.text)
-                    target = result.target
+                    if !terminal {
+                        Selection.replace(with: result.text)
+                        target = result.target
+                    } else if !selected.contains(where: \.isNewline) {
+                        // Assumes the selection is the text right before the cursor.
+                        Keys.backspace(selected.count)
+                        Keys.type(result.text)
+                        target = result.target
+                    }
                 }
                 DispatchQueue.main.async {
                     target?.select()
